@@ -46,6 +46,9 @@ import { ref, push, onValue, remove } from "https://www.gstatic.com/firebasejs/1
 
 let currentUser = null;
 
+// Lista de admins
+const admins = ["marymartins5821@gmail.com", "jp9877475@gmail.com"];
+
 const tabProfile = document.getElementById("tabProfile");
 const tabProducts = document.getElementById("tabProducts");
 const profileTab = document.getElementById("profileTab");
@@ -55,9 +58,9 @@ const adminBtn = document.getElementById("adminBtn");
 
 // Toggle admin panel
 adminBtn.addEventListener("click", ()=>{
-  if(currentUser && currentUser.email==="marymartins5821@gmail.com"){
+  if(currentUser && admins.includes(currentUser.email)){
     adminPanel.style.display = adminPanel.style.display==="none" ? "block" : "none";
-  } else {alert("Apenas o admin pode acessar!");}
+  } else {alert("Apenas admins podem acessar!");}
 });
 
 // Tabs
@@ -108,10 +111,10 @@ onValue(productsRef, snapshot=>{
       <h3>${prod.name}</h3>
       <p>R$ ${prod.price}</p>
       <button class="buyBtn" onclick="window.open('https://wa.me/5548996354447','_blank')">Comprar</button>
-      ${currentUser && currentUser.email==="marymartins5821@gmail.com"?'<button class="removeBtn">Remover</button>':""}
+      ${currentUser && admins.includes(currentUser.email)?'<button class="removeBtn">Remover</button>':""}
     `;
     productsGrid.appendChild(card);
-    if(currentUser && currentUser.email==="marymartins5821@gmail.com"){
+    if(currentUser && admins.includes(currentUser.email)){
       card.querySelector(".removeBtn").addEventListener("click", ()=>{remove(ref(database,"products/"+prodId));});
     }
   });
