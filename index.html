@@ -1,228 +1,213 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Blox Bux</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blox Bux - Loja</title>
 <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <h1 class="logo">Blox <span>Bux</span></h1>
+    <button id="adminBtn" class="admin-toggle">Painel Admin</button>
+    <button id="iaBtn" class="admin-toggle" style="display:none;">Painel de Comandos IA</button>
+    <div class="tabs">
+      <button id="tabProfile" class="active">Perfil</button>
+      <button id="tabProducts">Produtos</button>
+    </div>
+    <div class="tabContent" id="profileTab">
+      <h2>Minha Conta</h2>
+      <p id="userEmail">Email: -</p>
+      <button id="logoutBtn">Sair</button>
+    </div>
+    <div class="tabContent" id="productsTab" style="display:none;">
+      <h2>Produtos</h2>
+      <p>Visualize todos os produtos abaixo.</p>
+    </div>
+    <!-- Painel Admin original -->
+    <div class="adminPanel" id="adminPanel" style="display:none;">
+      <h2>Admin</h2>
+      <input type="text" id="productName" placeholder="Nome do Produto">
+      <input type="text" id="productPrice" placeholder="Preço">
+      <input type="text" id="productImage" placeholder="URL da Imagem">
+      <button id="addProductBtn">Adicionar Produto</button>
+    </div>
+    <!-- Painel IA -->
+    <div class="adminPanel" id="iaPanel" style="display:none;">
+      <h2>Painel de Comandos IA (Apenas Mary)</h2>
+      <div id="chatLog" class="chat-log"></div>
+      <form id="chatForm">
+        <input id="chatInput" placeholder="Digite um comando, ex: bloqueie o site" autocomplete="off">
+        <button type="submit">Enviar</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Grid produtos -->
+  <div class="products-grid" id="productsGrid"></div>
+</div>
+
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-import { getDatabase, ref, set, onValue, remove } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+import { auth, database } from "./firebase-config.js";
+import { signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { ref, push, onValue, remove, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-// Firebase Config
-const firebaseConfig = {
-  apiKey: "AIzaSyC3wm5X7fBXjC8hUQv4sRdHS-v74KWIBC4",
-  authDomain: "blox-bux.firebaseapp.com",
-  projectId: "blox-bux",
-  storageBucket: "blox-bux.appspot.com",
-  messagingSenderId: "2964601609",
-  appId: "1:2964601609:web:67ee85c8174825aee471d8"
-};
+let currentUser = null;
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getDatabase(app);
+// Lista de admins
+const admins = ["marymartins5821@gmail.com", "jp9877475@gmail.com"];
 
-// Verifica login
-onAuthStateChanged(auth, user => {
-  if (!user) { window.location.href = "login.html"; return; }
-  window.currentUserEmail = user.email;
-  document.getElementById("user-name").innerText = user.displayName || user.email;
-  document.getElementById("user-email").innerText = user.email;
+const tabProfile = document.getElementById("tabProfile");
+const tabProducts = document.getElementById("tabProducts");
+const profileTab = document.getElementById("profileTab");
+const productsTab = document.getElementById("productsTab");
+const adminPanel = document.getElementById("adminPanel");
+const adminBtn = document.getElementById("adminBtn");
 
-  if(user.email === "marymartins5821@gmail.com"){
-    document.getElementById("admin-btn").style.display = "block";
-    document.getElementById("botao-comandos").style.display = "block";
-  }
+// Painel IA
+const iaBtn = document.getElementById("iaBtn");
+const iaPanel = document.getElementById("iaPanel");
+const chatForm = document.getElementById("chatForm");
+const chatInput = document.getElementById("chatInput");
+const chatLog = document.getElementById("chatLog");
 
-  carregarProdutos();
+// Toggle admin panel
+adminBtn.addEventListener("click", ()=>{
+  if(currentUser && admins.includes(currentUser.email)){
+    adminPanel.style.display = adminPanel.style.display==="none" ? "block" : "none";
+  } else {alert("Apenas admins podem acessar!");}
+});
+
+// Toggle IA panel
+iaBtn.addEventListener("click", ()=>{
+  if(currentUser && currentUser.email === "marymartins5821@gmail.com"){
+    iaPanel.style.display = iaPanel.style.display==="none" ? "block" : "none";
+  } else {alert("Apenas Mary pode acessar!");}
+});
+
+// Tabs
+tabProfile.addEventListener("click", ()=>{
+  profileTab.style.display="block"; productsTab.style.display="none"; 
+  tabProfile.classList.add("active"); tabProducts.classList.remove("active");
+});
+tabProducts.addEventListener("click", ()=>{
+  productsTab.style.display="block"; profileTab.style.display="none"; 
+  tabProducts.classList.add("active"); tabProfile.classList.remove("active");
 });
 
 // Logout
-document.getElementById("logout").addEventListener("click", () => {
-  signOut(auth).then(() => window.location.href = "login.html");
+document.getElementById("logoutBtn").addEventListener("click", ()=>{signOut(auth); window.location.href="login.html";});
+
+// Monitor auth
+onAuthStateChanged(auth, user=>{
+  if(user){
+    currentUser=user;
+    document.getElementById("userEmail").innerText="Email: "+user.email;
+
+    // Mostra botão painel IA apenas para Mary
+    if(user.email === "marymartins5821@gmail.com"){
+      iaBtn.style.display="block";
+    }
+
+  }else{window.location.href="login.html";}
 });
 
-// Abas
-function showTab(tab){
-  document.querySelectorAll(".tab-content").forEach(c=>c.classList.remove("show"));
-  document.getElementById(tab).classList.add("show");
-  document.querySelectorAll(".tab-btn").forEach(btn=>btn.classList.remove("active"));
-  document.getElementById("tab-"+tab).classList.add("active");
-}
-document.getElementById("tab-account").addEventListener("click", ()=>showTab("account"));
-document.getElementById("tab-products").addEventListener("click", ()=>showTab("products"));
+// Firebase DB
+const productsRef = ref(database,"products");
+const productsGrid = document.getElementById("productsGrid");
 
-// Painel Admin
-document.getElementById("admin-btn").addEventListener("click", ()=>{
-  document.getElementById("admin-section").classList.toggle("show-admin");
+// Adicionar Produto
+document.getElementById("addProductBtn").addEventListener("click", ()=>{
+  const name = document.getElementById("productName").value;
+  const price = document.getElementById("productPrice").value;
+  const image = document.getElementById("productImage").value;
+  if(name && price && image){
+    push(productsRef,{name,price,image})
+      .then(()=>{document.getElementById("productName").value=""; document.getElementById("productPrice").value=""; document.getElementById("productImage").value="";})
+      .catch(err=>alert("Erro ao adicionar produto: "+err.message));
+  }
 });
 
-// Carregar produtos
-function carregarProdutos(){
-  const lista = document.getElementById("products-list");
-  const userEmail = window.currentUserEmail||"";
-  onValue(ref(db,'produtos/'), snapshot => {
-    const data = snapshot.val() || {};
-    lista.innerHTML = "";
-    Object.keys(data).forEach(key=>{
-      const produto = data[key];
-      let removerBtn = "";
-      if(userEmail === "marymartins5821@gmail.com"){
-        removerBtn = `<button class="remove-btn" data-key="${key}">Remover</button>`;
-      }
-      lista.innerHTML += `
-        <div class="product-card">
-          <div class="product-info">
-            <h3>${produto.nome}</h3>
-            <p>R$ ${produto.preco}</p>
-          </div>
-          <div class="product-buttons">
-            <a href="compra.html?produto=${encodeURIComponent(produto.nome)}">
-              <button class="buy-btn">Comprar</button>
-            </a>
-            ${removerBtn}
-          </div>
-        </div>
-      `;
-    });
-    document.querySelectorAll(".remove-btn").forEach(btn=>{
-      btn.addEventListener("click", e=>{
-        const key = e.target.getAttribute("data-key");
-        remove(ref(db,'produtos/'+key));
-      });
-    });
+// Carregar Produtos
+onValue(productsRef, snapshot=>{
+  productsGrid.innerHTML="";
+  snapshot.forEach(snap=>{
+    const prod = snap.val(); const prodId = snap.key;
+    const card = document.createElement("div"); card.classList.add("product-card");
+    card.innerHTML=`
+      <div class="img-container"><img src="${prod.image}" alt="${prod.name}"></div>
+      <h3>${prod.name}</h3>
+      <p>R$ ${prod.price}</p>
+      <button class="buyBtn" onclick="window.open('https://wa.me/5548996354447','_blank')">Comprar</button>
+      ${currentUser && admins.includes(currentUser.email)?'<button class="removeBtn">Remover</button>':""}
+    `;
+    productsGrid.appendChild(card);
+    if(currentUser && admins.includes(currentUser.email)){
+      card.querySelector(".removeBtn").addEventListener("click", ()=>{remove(ref(database,"products/"+prodId));});
+    }
   });
-}
-
-// Adicionar produto (Admin)
-document.getElementById("product-form").addEventListener("submit", e=>{
-  e.preventDefault();
-  const nome = document.getElementById("product-name").value;
-  const preco = document.getElementById("product-price").value;
-  if(!nome || !preco){ alert("Preencha todos os campos!"); return; }
-  const newKey = Date.now();
-  set(ref(db,'produtos/'+newKey),{nome,preco})
-    .then(()=>{ document.getElementById("product-form").reset(); })
-    .catch(err=>alert(err.message));
 });
 
-// ======================
-// PAINEL DE COMANDOS IA
-// ======================
-
-// Botão para abrir painel de comandos
-document.getElementById("botao-comandos").addEventListener("click", () => {
-  const painel = document.getElementById("painel-comandos");
-  painel.style.display = painel.style.display === "none" ? "block" : "none";
-});
-
-// Lista de ações e palavras-chave (mini IA)
-const acoes = {
+// ========================
+// Painel de Comandos IA
+// ========================
+const comandos = {
   bloqueio: ["bloqueie","fecha","trava","fechar","desativar"],
   desbloqueio: ["desbloqueie","abre","libera","ativar","ligar"],
   apagarProdutos: ["apague produtos","delete produtos","remova","limpar estoque"],
   mostrarPedidos: ["mostre pedidos","ver pedidos","listar pedidos","pedidos"]
 };
 
-// Chat IA
-document.getElementById("chat-form").addEventListener("submit", e => {
+chatForm.addEventListener("submit", e=>{
   e.preventDefault();
-  const input = document.getElementById("chat-input");
-  const msg = input.value.toLowerCase().trim();
-  const chatLog = document.getElementById("chat-log");
-
+  const msg = chatInput.value.toLowerCase().trim();
   let acaoDetectada = null;
 
-  for (const [acao, palavras] of Object.entries(acoes)) {
-    for (const palavra of palavras) {
-      if (msg.includes(palavra)) {
+  for(const [acao,palavras] of Object.entries(comandos)){
+    for(const palavra of palavras){
+      if(msg.includes(palavra)){
         acaoDetectada = acao;
         break;
       }
     }
-    if (acaoDetectada) break;
+    if(acaoDetectada) break;
   }
 
   let resposta = "❌ Não entendi. Tente algo como 'bloqueie o site' ou 'desbloqueie o site'.";
 
-  if (acaoDetectada === "bloqueio") {
-    set(ref(db, "siteStatus"), "offline");
-    resposta = "🔒 Site bloqueado.";
-  } else if (acaoDetectada === "desbloqueio") {
-    set(ref(db, "siteStatus"), "online");
-    resposta = "🔓 Site desbloqueado.";
-  } else if (acaoDetectada === "apagarProdutos") {
-    onValue(ref(db, "produtos"), snapshot => {
-      const data = snapshot.val() || {};
-      Object.keys(data).forEach(key => remove(ref(db,"produtos/"+key)));
+  if(acaoDetectada==="bloqueio"){
+    set(ref(database,"siteStatus"),"offline");
+    resposta="🔒 Site bloqueado.";
+  } else if(acaoDetectada==="desbloqueio"){
+    set(ref(database,"siteStatus"),"online");
+    resposta="🔓 Site desbloqueado.";
+  } else if(acaoDetectada==="apagarProdutos"){
+    onValue(productsRef,snap=>{
+      snap.forEach(s=>{
+        remove(ref(database,"products/"+s.key));
+      });
     });
-    resposta = "🗑️ Todos os produtos foram apagados.";
-  } else if (acaoDetectada === "mostrarPedidos") {
-    resposta = "📦 Pedidos atuais: 3 (exemplo).";
+    resposta="🗑️ Todos os produtos foram apagados.";
+  } else if(acaoDetectada==="mostrarPedidos"){
+    resposta="📦 Pedidos atuais: 3 (exemplo).";
   }
 
   chatLog.innerHTML += `<p><strong>Você:</strong> ${msg}</p>`;
   chatLog.innerHTML += `<p><strong>Sistema:</strong> ${resposta}</p>`;
   chatLog.scrollTop = chatLog.scrollHeight;
-
-  input.value = "";
+  chatInput.value="";
 });
 
 // Bloquear site para todos exceto Mary
-onValue(ref(db, "siteStatus"), snapshot => {
-  const status = snapshot.val() || "online";
-  if(status === "offline" && window.currentUserEmail !== "marymartins5821@gmail.com"){
-    document.body.innerHTML = "<h1 style='color:red;text-align:center;margin-top:50px;'>🚫 Loja temporariamente fora do ar</h1>";
+onValue(ref(database,"siteStatus"), snap=>{
+  const status = snap.val()||"online";
+  if(status==="offline" && currentUser?.email !== "marymartins5821@gmail.com"){
+    document.body.innerHTML="<h1 style='color:red;text-align:center;margin-top:50px;'>🚫 Loja temporariamente fora do ar</h1>";
   }
 });
 </script>
-</head>
-<body class="main-body">
-
-<header>
-  <h1>Blox Bux</h1>
-  <button id="logout">Sair</button>
-</header>
-
-<div class="tabs">
-  <button id="tab-account" class="tab-btn active">Minha Conta</button>
-  <button id="tab-products" class="tab-btn">Produtos</button>
-  <button id="admin-btn" style="display:none;">Admin</button>
-  <button id="botao-comandos" style="display:none;">Painel de Comandos</button>
-</div>
-
-<!-- Abas -->
-<div id="account" class="tab-content show">
-  <h2>Minha Conta</h2>
-  <p>Nome: <span id="user-name"></span></p>
-  <p>Email: <span id="user-email"></span></p>
-</div>
-
-<div id="products" class="tab-content">
-  <h2>Produtos</h2>
-  <div id="products-list" class="product-list"></div>
-</div>
-
-<!-- Painel Admin -->
-<div id="admin-section" class="admin-panel">
-  <h2>Painel Admin</h2>
-  <form id="product-form">
-    <input id="product-name" placeholder="Nome do Produto" required><br><br>
-    <input id="product-price" type="number" placeholder="Preço" required><br><br>
-    <button type="submit">Adicionar Produto</button>
-  </form>
-</div>
-
-<!-- Painel de Comandos -->
-<div id="painel-comandos" class="admin-panel" style="display:none;">
-  <h2>Painel de Comandos (Apenas Mary)</h2>
-  <div id="chat-log" class="chat-log"></div>
-  <form id="chat-form">
-    <input id="chat-input" placeholder="Digite um comando, ex: bloqueie o site" autocomplete="off">
-    <button type="submit">Enviar</button>
-  </form>
-</div>
-
 </body>
 </html>
