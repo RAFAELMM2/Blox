@@ -13,37 +13,42 @@
   <div class="sidebar">
     <h1 class="logo">Blox <span>Bux</span></h1>
     <button id="adminBtn" class="admin-toggle">Painel Admin</button>
-    <button id="iaBtn" class="admin-toggle" style="display:none;">Painel de Comandos IA</button>
+    <button id="iaBtn" class="admin-toggle">Painel IA</button>
     <div class="tabs">
       <button id="tabProfile" class="active">Perfil</button>
       <button id="tabProducts">Produtos</button>
     </div>
+
     <div class="tabContent" id="profileTab">
       <h2>Minha Conta</h2>
       <p id="userEmail">Email: -</p>
       <button id="logoutBtn">Sair</button>
     </div>
+
     <div class="tabContent" id="productsTab" style="display:none;">
       <h2>Produtos</h2>
       <p>Visualize todos os produtos abaixo.</p>
     </div>
-    <!-- Painel Admin original -->
+
+    <!-- Painel Admin produtos -->
     <div class="adminPanel" id="adminPanel" style="display:none;">
-      <h2>Admin</h2>
+      <h2>Admin Produtos</h2>
       <input type="text" id="productName" placeholder="Nome do Produto">
       <input type="text" id="productPrice" placeholder="Preço">
       <input type="text" id="productImage" placeholder="URL da Imagem">
       <button id="addProductBtn">Adicionar Produto</button>
     </div>
+
     <!-- Painel IA -->
     <div class="adminPanel" id="iaPanel" style="display:none;">
-      <h2>Painel de Comandos IA (Apenas Mary)</h2>
-      <div id="chatLog" class="chat-log"></div>
+      <h2>Painel IA</h2>
+      <div id="chatLog" style="height:200px; overflow:auto; background:#111; padding:10px; border-radius:8px; margin-bottom:10px;"></div>
       <form id="chatForm">
-        <input id="chatInput" placeholder="Digite um comando, ex: bloqueie o site" autocomplete="off">
-        <button type="submit">Enviar</button>
+        <input type="text" id="chatInput" placeholder="Digite um comando" style="width:100%;padding:10px;border-radius:8px;border:none;">
+        <button type="submit" style="width:100%;margin-top:5px;background:#00ff88;color:#000;font-weight:bold;border-radius:8px;">Enviar</button>
       </form>
     </div>
+
   </div>
 
   <!-- Grid produtos -->
@@ -56,8 +61,6 @@ import { signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
 import { ref, push, onValue, remove, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 let currentUser = null;
-
-// Lista de admins
 const admins = ["marymartins5821@gmail.com", "jp9877475@gmail.com"];
 
 const tabProfile = document.getElementById("tabProfile");
@@ -65,27 +68,22 @@ const tabProducts = document.getElementById("tabProducts");
 const profileTab = document.getElementById("profileTab");
 const productsTab = document.getElementById("productsTab");
 const adminPanel = document.getElementById("adminPanel");
-const adminBtn = document.getElementById("adminBtn");
-
-// Painel IA
-const iaBtn = document.getElementById("iaBtn");
 const iaPanel = document.getElementById("iaPanel");
-const chatForm = document.getElementById("chatForm");
-const chatInput = document.getElementById("chatInput");
-const chatLog = document.getElementById("chatLog");
+const adminBtn = document.getElementById("adminBtn");
+const iaBtn = document.getElementById("iaBtn");
 
-// Toggle admin panel
+// Toggle Painel Admin produtos
 adminBtn.addEventListener("click", ()=>{
   if(currentUser && admins.includes(currentUser.email)){
     adminPanel.style.display = adminPanel.style.display==="none" ? "block" : "none";
   } else {alert("Apenas admins podem acessar!");}
 });
 
-// Toggle IA panel
+// Toggle Painel IA
 iaBtn.addEventListener("click", ()=>{
-  if(currentUser && currentUser.email === "marymartins5821@gmail.com"){
+  if(currentUser && currentUser.email==="marymartins5821@gmail.com"){
     iaPanel.style.display = iaPanel.style.display==="none" ? "block" : "none";
-  } else {alert("Apenas Mary pode acessar!");}
+  } else {alert("Apenas Mary pode acessar o Painel IA!");}
 });
 
 // Tabs
@@ -106,12 +104,6 @@ onAuthStateChanged(auth, user=>{
   if(user){
     currentUser=user;
     document.getElementById("userEmail").innerText="Email: "+user.email;
-
-    // Mostra botão painel IA apenas para Mary
-    if(user.email === "marymartins5821@gmail.com"){
-      iaBtn.style.display="block";
-    }
-
   }else{window.location.href="login.html";}
 });
 
@@ -152,60 +144,83 @@ onValue(productsRef, snapshot=>{
 });
 
 // ========================
-// Painel de Comandos IA
+// IA avançada para comandos
 // ========================
-const comandos = {
-  bloqueio: ["bloqueie","fecha","trava","fechar","desativar"],
-  desbloqueio: ["desbloqueie","abre","libera","ativar","ligar"],
-  apagarProdutos: ["apague produtos","delete produtos","remova","limpar estoque"],
-  mostrarPedidos: ["mostre pedidos","ver pedidos","listar pedidos","pedidos"]
-};
+const iaComandosFlex = [
+  {acao:"bloqueio", palavrasChave:["bloqueie","fecha","trava","fechar","desativar","pare","não deixa entrar"]},
+  {acao:"desbloqueio", palavrasChave:["desbloqueie","abre","libera","ativar","ligar","deixa entrar"]},
+  {acao:"apagarProdutos", palavrasChave:["apague produtos","delete produtos","remova","limpar estoque","zerar produtos","apagar todos"]},
+  {acao:"mostrarPedidos", palavrasChave:["mostre pedidos","ver pedidos","listar pedidos","pedidos","quem comprou","vendas"]}
+];
 
+const chatForm = document.getElementById("chatForm");
+const chatInput = document.getElementById("chatInput");
+const chatLog = document.getElementById("chatLog");
+
+// Detectar ação pela frase
+function detectarAcao(msg){
+  for(const cmd of iaComandosFlex){
+    for(const palavra of cmd.palavrasChave){
+      if(msg.includes(palavra)) return cmd.acao;
+    }
+  }
+  return null;
+}
+
+// Escrever no chat
+function escreverChat(usuario, mensagem){
+  chatLog.innerHTML += `<p><strong>${usuario}:</strong> ${mensagem}</p>`;
+  chatLog.scrollTop = chatLog.scrollHeight;
+}
+
+// Evento chat IA
 chatForm.addEventListener("submit", e=>{
   e.preventDefault();
   const msg = chatInput.value.toLowerCase().trim();
-  let acaoDetectada = null;
+  const acao = detectarAcao(msg);
+  let resposta = "❌ Não entendi. Tente escrever de outro jeito.";
 
-  for(const [acao,palavras] of Object.entries(comandos)){
-    for(const palavra of palavras){
-      if(msg.includes(palavra)){
-        acaoDetectada = acao;
+  if(acao){
+    switch(acao){
+      case "bloqueio":
+        set(ref(database,"siteStatus"),"offline");
+        resposta="🔒 Site bloqueado pelo admin. Volte depois.";
         break;
-      }
+      case "desbloqueio":
+        set(ref(database,"siteStatus"),"online");
+        resposta="🔓 Site desbloqueado pelo admin.";
+        break;
+      case "apagarProdutos":
+        onValue(productsRef, snap=>{
+          snap.forEach(s=>{
+            remove(ref(database,"products/"+s.key));
+          });
+        });
+        resposta="🗑️ Todos os produtos foram apagados.";
+        break;
+      case "mostrarPedidos":
+        resposta="📦 Pedidos atuais: 3 (exemplo).";
+        break;
     }
-    if(acaoDetectada) break;
   }
 
-  let resposta = "❌ Não entendi. Tente algo como 'bloqueie o site' ou 'desbloqueie o site'.";
-
-  if(acaoDetectada==="bloqueio"){
-    set(ref(database,"siteStatus"),"offline");
-    resposta="🔒 Site bloqueado.";
-  } else if(acaoDetectada==="desbloqueio"){
-    set(ref(database,"siteStatus"),"online");
-    resposta="🔓 Site desbloqueado.";
-  } else if(acaoDetectada==="apagarProdutos"){
-    onValue(productsRef,snap=>{
-      snap.forEach(s=>{
-        remove(ref(database,"products/"+s.key));
-      });
-    });
-    resposta="🗑️ Todos os produtos foram apagados.";
-  } else if(acaoDetectada==="mostrarPedidos"){
-    resposta="📦 Pedidos atuais: 3 (exemplo).";
-  }
-
-  chatLog.innerHTML += `<p><strong>Você:</strong> ${msg}</p>`;
-  chatLog.innerHTML += `<p><strong>Sistema:</strong> ${resposta}</p>`;
-  chatLog.scrollTop = chatLog.scrollHeight;
+  escreverChat("Você", msg);
+  escreverChat("IA", resposta);
   chatInput.value="";
 });
 
-// Bloquear site para todos exceto Mary
+// ========================
+// Bloqueio do site para todos exceto Mary
+// ========================
 onValue(ref(database,"siteStatus"), snap=>{
   const status = snap.val()||"online";
   if(status==="offline" && currentUser?.email !== "marymartins5821@gmail.com"){
-    document.body.innerHTML="<h1 style='color:red;text-align:center;margin-top:50px;'>🚫 Loja temporariamente fora do ar</h1>";
+    document.body.innerHTML = `
+      <h1 style="color:red;text-align:center;margin-top:50px;">
+        🚫 Loja temporariamente fora do ar pelo admin<br>
+        ⏳ Volte mais tarde!
+      </h1>
+    `;
   }
 });
 </script>
