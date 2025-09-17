@@ -13,7 +13,8 @@
   <div class="sidebar">
     <h1 class="logo">Blox <span>Bux</span></h1>
     <button id="adminBtn" class="admin-toggle">Painel Admin</button>
-    <button id="iaBtn" class="admin-toggle" style="display:none;">Painel IA</button>
+    <button id="iaBtn" class="admin-toggle">Painel IA</button>
+
     <div class="tabs">
       <button id="tabProfile" class="active">Perfil</button>
       <button id="tabProducts">Produtos</button>
@@ -32,23 +33,20 @@
 
     <!-- Painel Admin produtos -->
     <div class="adminPanel" id="adminPanel" style="display:none;">
-      <h2>Admin Produtos</h2>
+      <h2>Admin - Produtos</h2>
       <input type="text" id="productName" placeholder="Nome do Produto">
       <input type="text" id="productPrice" placeholder="Preço">
       <input type="text" id="productImage" placeholder="URL da Imagem">
       <button id="addProductBtn">Adicionar Produto</button>
     </div>
 
-    <!-- Painel IA apenas Mary -->
+    <!-- Painel IA -->
     <div class="adminPanel" id="iaPanel" style="display:none;">
       <h2>Painel IA</h2>
-      <div id="chatLog" style="height:200px; overflow:auto; background:#111; padding:10px; border-radius:8px; margin-bottom:10px;"></div>
-      <form id="chatForm">
-        <input type="text" id="chatInput" placeholder="Digite um comando" style="width:100%;padding:10px;border-radius:8px;border:none;">
-        <button type="submit" style="width:100%;margin-top:5px;background:#00ff88;color:#000;font-weight:bold;border-radius:8px;">Enviar</button>
-      </form>
+      <input type="text" id="iaCommand" placeholder="Digite o comando">
+      <button id="sendCommandBtn">Enviar</button>
+      <div id="iaChat" style="height:200px;overflow:auto;margin-top:10px;background:#111;padding:10px;border-radius:8px;"></div>
     </div>
-
   </div>
 
   <!-- Grid produtos -->
@@ -58,10 +56,11 @@
 <script type="module">
 import { auth, database } from "./firebase-config.js";
 import { signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { ref, push, onValue, remove, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { ref, push, onValue, remove, set, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 let currentUser = null;
-const admins = ["marymartins5821@gmail.com", "jp9877475@gmail.com"];
+const admins = ["marymartins5821@gmail.com","jp9877475@gmail.com"];
+const iaOwner = "marymartins5821@gmail.com";
 
 const tabProfile = document.getElementById("tabProfile");
 const tabProducts = document.getElementById("tabProducts");
@@ -71,19 +70,22 @@ const adminPanel = document.getElementById("adminPanel");
 const iaPanel = document.getElementById("iaPanel");
 const adminBtn = document.getElementById("adminBtn");
 const iaBtn = document.getElementById("iaBtn");
+const productsGrid = document.getElementById("productsGrid");
+const iaChat = document.getElementById("iaChat");
+const siteStatusRef = ref(database,"siteStatus");
 
-// Toggle Painel Admin produtos
+// Toggle admin panel
 adminBtn.addEventListener("click", ()=>{
   if(currentUser && admins.includes(currentUser.email)){
     adminPanel.style.display = adminPanel.style.display==="none" ? "block" : "none";
   } else {alert("Apenas admins podem acessar!");}
 });
 
-// Toggle Painel IA só Mary
+// Toggle IA panel
 iaBtn.addEventListener("click", ()=>{
-  if(currentUser && currentUser.email==="marymartins5821@gmail.com"){
+  if(currentUser && currentUser.email === iaOwner){
     iaPanel.style.display = iaPanel.style.display==="none" ? "block" : "none";
-  }
+  } else {alert("Apenas Mary pode acessar a IA!");}
 });
 
 // Tabs
@@ -97,24 +99,20 @@ tabProducts.addEventListener("click", ()=>{
 });
 
 // Logout
-document.getElementById("logoutBtn").addEventListener("click", ()=>{signOut(auth); window.location.href="login.html";});
+document.getElementById("logoutBtn").addEventListener("click", ()=>{
+  signOut(auth); window.location.href="login.html";
+});
 
 // Monitor auth
 onAuthStateChanged(auth, user=>{
   if(user){
     currentUser=user;
     document.getElementById("userEmail").innerText="Email: "+user.email;
-
-    // Mostrar botão IA apenas para Mary
-    if(currentUser.email==="marymartins5821@gmail.com"){
-      iaBtn.style.display="block";
-    }
   }else{window.location.href="login.html";}
 });
 
-// Firebase DB
+// Firebase DB - produtos
 const productsRef = ref(database,"products");
-const productsGrid = document.getElementById("productsGrid");
 
 // Adicionar Produto
 document.getElementById("addProductBtn").addEventListener("click", ()=>{
@@ -148,89 +146,49 @@ onValue(productsRef, snapshot=>{
   });
 });
 
-// ========================
-// IA avançada apenas para Mary
-// ========================
-const siteStatusRef = ref(database,"siteStatus");
-if(currentUser?.email==="marymartins5821@gmail.com"){
-  const iaComandosFlex = [
-    {acao:"bloqueio", palavrasChave:["bloqueie","fecha","trava","fechar","desativar","pare","não deixa entrar"]},
-    {acao:"desbloqueio", palavrasChave:["desbloqueie","abre","libera","ativar","ligar","deixa entrar"]},
-    {acao:"apagarProdutos", palavrasChave:["apague produtos","delete produtos","remova","limpar estoque","zerar produtos","apagar todos"]},
-    {acao:"mostrarPedidos", palavrasChave:["mostre pedidos","ver pedidos","listar pedidos","pedidos","quem comprou","vendas"]}
-  ];
-
-  const chatForm = document.getElementById("chatForm");
-  const chatInput = document.getElementById("chatInput");
-  const chatLog = document.getElementById("chatLog");
-
-  function detectarAcao(msg){
-    for(const cmd of iaComandosFlex){
-      for(const palavra of cmd.palavrasChave){
-        if(msg.includes(palavra)) return cmd.acao;
-      }
-    }
-    return null;
-  }
-
-  function escreverChat(usuario, mensagem){
-    chatLog.innerHTML += `<p><strong>${usuario}:</strong> ${mensagem}</p>`;
-    chatLog.scrollTop = chatLog.scrollHeight;
-  }
-
-  chatForm.addEventListener("submit", e=>{
-    e.preventDefault();
-    const msg = chatInput.value.toLowerCase().trim();
-    const acao = detectarAcao(msg);
-    let resposta = "❌ Não entendi. Tente escrever de outro jeito.";
-
-    if(acao){
-      switch(acao){
-        case "bloqueio":
-          set(siteStatusRef,"offline");
-          resposta="🔒 Site bloqueado pelo admin. Volte depois.";
-          break;
-        case "desbloqueio":
-          set(siteStatusRef,"online");
-          resposta="🔓 Site desbloqueado pelo admin.";
-          break;
-        case "apagarProdutos":
-          onValue(productsRef, snap=>{
-            snap.forEach(s=>{
-              remove(ref(database,"products/"+s.key));
-            });
-          });
-          resposta="🗑️ Todos os produtos foram apagados.";
-          break;
-        case "mostrarPedidos":
-          resposta="📦 Pedidos atuais: 3 (exemplo).";
-          break;
-      }
-    }
-
-    escreverChat("Você", msg);
-    escreverChat("IA", resposta);
-    chatInput.value="";
-  });
-}
-
-// ========================
-// Bloqueio do site em tempo real
-// ========================
+// Verifica status site
 function verificarStatusSite(status){
-  if(status==="offline" && (!currentUser || currentUser.email !== "marymartins5821@gmail.com")){
+  if(status==="offline" && (!currentUser || currentUser.email !== iaOwner)){
     document.body.innerHTML = `
       <h1 style="color:red;text-align:center;margin-top:50px;">
-        🔒 Loja temporariamente fora do ar pelo admin<br>
+        🔒 Site bloqueado pelo admin<br>
         ⏳ Volte mais tarde!
       </h1>
     `;
   }
 }
 
+// Listener siteStatus
 onValue(siteStatusRef, snap=>{
   const status = snap.val() || "online";
   verificarStatusSite(status);
+});
+
+// IA - comandos
+const comandos = {
+  "bloquear": () => set(siteStatusRef,"offline"),
+  "desbloquear": () => set(siteStatusRef,"online")
+  // você pode adicionar mais comandos aqui: apagar produto, mudar preço, etc.
+};
+
+// Enviar comando IA
+document.getElementById("sendCommandBtn").addEventListener("click", ()=>{
+  const cmdText = document.getElementById("iaCommand").value.trim().toLowerCase();
+  if(!cmdText) return;
+
+  let reconhecido = false;
+  for(const key in comandos){
+    if(cmdText.includes(key)){
+      comandos[key]();
+      iaChat.innerHTML += `<p style="color:#0f0;">✅ Comando '${key}' executado.</p>`;
+      reconhecido=true; break;
+    }
+  }
+  if(!reconhecido){
+    iaChat.innerHTML += `<p style="color:#ff4444;">❌ Comando não reconhecido.</p>`;
+  }
+  iaChat.scrollTop = iaChat.scrollHeight;
+  document.getElementById("iaCommand").value="";
 });
 </script>
 </body>
