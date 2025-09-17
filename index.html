@@ -39,7 +39,7 @@
       <button id="addProductBtn">Adicionar Produto</button>
     </div>
 
-    <!-- Painel IA -->
+    <!-- Painel IA apenas Mary -->
     <div class="adminPanel" id="iaPanel" style="display:none;">
       <h2>Painel IA</h2>
       <div id="chatLog" style="height:200px; overflow:auto; background:#111; padding:10px; border-radius:8px; margin-bottom:10px;"></div>
@@ -151,6 +151,7 @@ onValue(productsRef, snapshot=>{
 // ========================
 // IA avançada apenas para Mary
 // ========================
+const siteStatusRef = ref(database,"siteStatus");
 if(currentUser?.email==="marymartins5821@gmail.com"){
   const iaComandosFlex = [
     {acao:"bloqueio", palavrasChave:["bloqueie","fecha","trava","fechar","desativar","pare","não deixa entrar"]},
@@ -186,11 +187,11 @@ if(currentUser?.email==="marymartins5821@gmail.com"){
     if(acao){
       switch(acao){
         case "bloqueio":
-          set(ref(database,"siteStatus"),"offline");
+          set(siteStatusRef,"offline");
           resposta="🔒 Site bloqueado pelo admin. Volte depois.";
           break;
         case "desbloqueio":
-          set(ref(database,"siteStatus"),"online");
+          set(siteStatusRef,"online");
           resposta="🔓 Site desbloqueado pelo admin.";
           break;
         case "apagarProdutos":
@@ -214,18 +215,22 @@ if(currentUser?.email==="marymartins5821@gmail.com"){
 }
 
 // ========================
-// Bloqueio do site para todos exceto Mary
+// Bloqueio do site em tempo real
 // ========================
-onValue(ref(database,"siteStatus"), snap=>{
-  const status = snap.val()||"online";
-  if(status==="offline" && currentUser?.email !== "marymartins5821@gmail.com"){
+function verificarStatusSite(status){
+  if(status==="offline" && (!currentUser || currentUser.email !== "marymartins5821@gmail.com")){
     document.body.innerHTML = `
       <h1 style="color:red;text-align:center;margin-top:50px;">
-        🚫 Loja temporariamente fora do ar pelo admin<br>
+        🔒 Loja temporariamente fora do ar pelo admin<br>
         ⏳ Volte mais tarde!
       </h1>
     `;
   }
+}
+
+onValue(siteStatusRef, snap=>{
+  const status = snap.val() || "online";
+  verificarStatusSite(status);
 });
 </script>
 </body>
