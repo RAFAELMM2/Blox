@@ -13,7 +13,7 @@
   <div class="sidebar">
     <h1 class="logo">Blox <span>Bux</span></h1>
     <button id="adminBtn" class="admin-toggle">Painel Admin</button>
-    <button id="iaBtn" class="admin-toggle">Painel IA</button>
+    <button id="iaBtn" class="admin-toggle" style="display:none;">Painel IA</button>
     <div class="tabs">
       <button id="tabProfile" class="active">Perfil</button>
       <button id="tabProducts">Produtos</button>
@@ -79,11 +79,11 @@ adminBtn.addEventListener("click", ()=>{
   } else {alert("Apenas admins podem acessar!");}
 });
 
-// Toggle Painel IA
+// Toggle Painel IA só Mary
 iaBtn.addEventListener("click", ()=>{
   if(currentUser && currentUser.email==="marymartins5821@gmail.com"){
     iaPanel.style.display = iaPanel.style.display==="none" ? "block" : "none";
-  } else {alert("Apenas Mary pode acessar o Painel IA!");}
+  }
 });
 
 // Tabs
@@ -104,6 +104,11 @@ onAuthStateChanged(auth, user=>{
   if(user){
     currentUser=user;
     document.getElementById("userEmail").innerText="Email: "+user.email;
+
+    // Mostrar botão IA apenas para Mary
+    if(currentUser.email==="marymartins5821@gmail.com"){
+      iaBtn.style.display="block";
+    }
   }else{window.location.href="login.html";}
 });
 
@@ -144,70 +149,69 @@ onValue(productsRef, snapshot=>{
 });
 
 // ========================
-// IA avançada para comandos
+// IA avançada apenas para Mary
 // ========================
-const iaComandosFlex = [
-  {acao:"bloqueio", palavrasChave:["bloqueie","fecha","trava","fechar","desativar","pare","não deixa entrar"]},
-  {acao:"desbloqueio", palavrasChave:["desbloqueie","abre","libera","ativar","ligar","deixa entrar"]},
-  {acao:"apagarProdutos", palavrasChave:["apague produtos","delete produtos","remova","limpar estoque","zerar produtos","apagar todos"]},
-  {acao:"mostrarPedidos", palavrasChave:["mostre pedidos","ver pedidos","listar pedidos","pedidos","quem comprou","vendas"]}
-];
+if(currentUser?.email==="marymartins5821@gmail.com"){
+  const iaComandosFlex = [
+    {acao:"bloqueio", palavrasChave:["bloqueie","fecha","trava","fechar","desativar","pare","não deixa entrar"]},
+    {acao:"desbloqueio", palavrasChave:["desbloqueie","abre","libera","ativar","ligar","deixa entrar"]},
+    {acao:"apagarProdutos", palavrasChave:["apague produtos","delete produtos","remova","limpar estoque","zerar produtos","apagar todos"]},
+    {acao:"mostrarPedidos", palavrasChave:["mostre pedidos","ver pedidos","listar pedidos","pedidos","quem comprou","vendas"]}
+  ];
 
-const chatForm = document.getElementById("chatForm");
-const chatInput = document.getElementById("chatInput");
-const chatLog = document.getElementById("chatLog");
+  const chatForm = document.getElementById("chatForm");
+  const chatInput = document.getElementById("chatInput");
+  const chatLog = document.getElementById("chatLog");
 
-// Detectar ação pela frase
-function detectarAcao(msg){
-  for(const cmd of iaComandosFlex){
-    for(const palavra of cmd.palavrasChave){
-      if(msg.includes(palavra)) return cmd.acao;
+  function detectarAcao(msg){
+    for(const cmd of iaComandosFlex){
+      for(const palavra of cmd.palavrasChave){
+        if(msg.includes(palavra)) return cmd.acao;
+      }
     }
+    return null;
   }
-  return null;
-}
 
-// Escrever no chat
-function escreverChat(usuario, mensagem){
-  chatLog.innerHTML += `<p><strong>${usuario}:</strong> ${mensagem}</p>`;
-  chatLog.scrollTop = chatLog.scrollHeight;
-}
+  function escreverChat(usuario, mensagem){
+    chatLog.innerHTML += `<p><strong>${usuario}:</strong> ${mensagem}</p>`;
+    chatLog.scrollTop = chatLog.scrollHeight;
+  }
 
-// Evento chat IA
-chatForm.addEventListener("submit", e=>{
-  e.preventDefault();
-  const msg = chatInput.value.toLowerCase().trim();
-  const acao = detectarAcao(msg);
-  let resposta = "❌ Não entendi. Tente escrever de outro jeito.";
+  chatForm.addEventListener("submit", e=>{
+    e.preventDefault();
+    const msg = chatInput.value.toLowerCase().trim();
+    const acao = detectarAcao(msg);
+    let resposta = "❌ Não entendi. Tente escrever de outro jeito.";
 
-  if(acao){
-    switch(acao){
-      case "bloqueio":
-        set(ref(database,"siteStatus"),"offline");
-        resposta="🔒 Site bloqueado pelo admin. Volte depois.";
-        break;
-      case "desbloqueio":
-        set(ref(database,"siteStatus"),"online");
-        resposta="🔓 Site desbloqueado pelo admin.";
-        break;
-      case "apagarProdutos":
-        onValue(productsRef, snap=>{
-          snap.forEach(s=>{
-            remove(ref(database,"products/"+s.key));
+    if(acao){
+      switch(acao){
+        case "bloqueio":
+          set(ref(database,"siteStatus"),"offline");
+          resposta="🔒 Site bloqueado pelo admin. Volte depois.";
+          break;
+        case "desbloqueio":
+          set(ref(database,"siteStatus"),"online");
+          resposta="🔓 Site desbloqueado pelo admin.";
+          break;
+        case "apagarProdutos":
+          onValue(productsRef, snap=>{
+            snap.forEach(s=>{
+              remove(ref(database,"products/"+s.key));
+            });
           });
-        });
-        resposta="🗑️ Todos os produtos foram apagados.";
-        break;
-      case "mostrarPedidos":
-        resposta="📦 Pedidos atuais: 3 (exemplo).";
-        break;
+          resposta="🗑️ Todos os produtos foram apagados.";
+          break;
+        case "mostrarPedidos":
+          resposta="📦 Pedidos atuais: 3 (exemplo).";
+          break;
+      }
     }
-  }
 
-  escreverChat("Você", msg);
-  escreverChat("IA", resposta);
-  chatInput.value="";
-});
+    escreverChat("Você", msg);
+    escreverChat("IA", resposta);
+    chatInput.value="";
+  });
+}
 
 // ========================
 // Bloqueio do site para todos exceto Mary
