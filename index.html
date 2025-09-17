@@ -12,11 +12,11 @@
   <!-- Sidebar -->
   <div class="sidebar">
     <h1 class="logo">Blox <span>Bux</span></h1>
-    <button id="adminBtn" class="admin-toggle">Painel IA</button>
 
     <div class="tabs">
       <button id="tabProfile" class="active">Perfil</button>
       <button id="tabProducts">Produtos</button>
+      <button id="tabAdmin" style="display:none;">Admin</button>
     </div>
 
     <div class="tabContent" id="profileTab">
@@ -30,12 +30,31 @@
       <p>Visualize todos os produtos abaixo.</p>
     </div>
 
-    <!-- Painel IA -->
-    <div class="adminPanel" id="adminPanel" style="display:none;">
-      <h2>Painel IA</h2>
-      <div id="iaChat" style="height:200px;overflow-y:auto;background:#000;border:1px solid #00ff88;padding:5px;margin-bottom:5px;"></div>
-      <input type="text" id="iaCommand" placeholder="Digite o comando">
-      <button id="sendCommandBtn">Enviar</button>
+    <!-- Painel Admin -->
+    <div class="tabContent adminPanel" id="adminTab" style="display:none;">
+      <h2>Painel Admin</h2>
+      
+      <!-- Adicionar Produto -->
+      <h3>Adicionar Produto</h3>
+      <input type="text" id="productName" placeholder="Nome do Produto">
+      <input type="text" id="productPrice" placeholder="Preço">
+      <input type="text" id="productImage" placeholder="URL da Imagem">
+      <button id="addProductBtn">Adicionar Produto</button>
+      
+      <hr style="border:1px solid #00ff88; margin:10px 0;">
+
+      <!-- Bloquear / Desbloquear Site -->
+      <h3>Controle do Site</h3>
+      <button id="blockSiteBtn">Bloquear Site</button>
+      <button id="unblockSiteBtn">Desbloquear Site</button>
+
+      <hr style="border:1px solid #00ff88; margin:10px 0;">
+
+      <!-- Adicionar / Remover Admin -->
+      <h3>Gerenciar Admins</h3>
+      <input type="text" id="adminEmailInput" placeholder="Email do usuário">
+      <button id="addAdminBtn">Adicionar Admin</button>
+      <button id="removeAdminBtn">Remover Admin</button>
     </div>
 
   </div>
@@ -51,35 +70,34 @@ import { signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
 import { ref, push, onValue, remove, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 let currentUser = null;
-let admins = ["marymartins5821@gmail.com", "jp9877475@gmail.com"];
-const iaOwner = "marymartins5821@gmail.com";
+let admins = ["marymartins5821@gmail.com", "jp9877475@gmail.com"]; // lista inicial de admins
+const mainAdmin = "marymartins5821@gmail.com";
 
 const tabProfile = document.getElementById("tabProfile");
 const tabProducts = document.getElementById("tabProducts");
+const tabAdminBtn = document.getElementById("tabAdmin");
+
 const profileTab = document.getElementById("profileTab");
 const productsTab = document.getElementById("productsTab");
-const adminPanel = document.getElementById("adminPanel");
-const adminBtn = document.getElementById("adminBtn");
-const iaChat = document.getElementById("iaChat");
+const adminTab = document.getElementById("adminTab");
 
-// Status do site
+const productsGrid = document.getElementById("productsGrid");
+
+// Controle site
 const siteStatusRef = ref(database,"siteStatus");
-
-// Toggle painel IA
-adminBtn.addEventListener("click", ()=>{
-  if(currentUser && currentUser.email===iaOwner){
-    adminPanel.style.display = adminPanel.style.display==="none" ? "block" : "none";
-  } else { alert("Apenas admin principal pode acessar!"); }
-});
 
 // Tabs
 tabProfile.addEventListener("click", ()=>{
-  profileTab.style.display="block"; productsTab.style.display="none"; 
-  tabProfile.classList.add("active"); tabProducts.classList.remove("active");
+  profileTab.style.display="block"; productsTab.style.display="none"; adminTab.style.display="none";
+  tabProfile.classList.add("active"); tabProducts.classList.remove("active"); tabAdminBtn.classList.remove("active");
 });
 tabProducts.addEventListener("click", ()=>{
-  productsTab.style.display="block"; profileTab.style.display="none"; 
-  tabProducts.classList.add("active"); tabProfile.classList.remove("active");
+  profileTab.style.display="none"; productsTab.style.display="block"; adminTab.style.display="none";
+  tabProducts.classList.add("active"); tabProfile.classList.remove("active"); tabAdminBtn.classList.remove("active");
+});
+tabAdminBtn.addEventListener("click", ()=>{
+  profileTab.style.display="none"; productsTab.style.display="none"; adminTab.style.display="block";
+  tabAdminBtn.classList.add("active"); tabProfile.classList.remove("active"); tabProducts.classList.remove("active");
 });
 
 // Logout
@@ -89,16 +107,20 @@ document.getElementById("logoutBtn").addEventListener("click", ()=>{
 });
 
 // Monitor auth
-onAuthStateChanged(auth,user=>{
+onAuthStateChanged(auth, user=>{
   if(user){
-    currentUser = user;
+    currentUser=user;
     document.getElementById("userEmail").innerText="Email: "+user.email;
+    // Mostrar botão Admin apenas se admin
+    if(admins.includes(user.email)){
+      tabAdminBtn.style.display="block";
+    }
   } else {
     window.location.href="login.html";
   }
 });
 
-// Monitor siteStatus em tempo real
+// Monitor siteStatus
 onValue(siteStatusRef, snapshot=>{
   const status = snapshot.val();
   if(status==="offline" && (!currentUser || !admins.includes(currentUser.email))){
@@ -110,9 +132,20 @@ onValue(siteStatusRef, snapshot=>{
 
 // Firebase DB produtos
 const productsRef = ref(database,"products");
-const productsGrid = document.getElementById("productsGrid");
 
-// Carregar produtos
+// Adicionar Produto
+document.getElementById("addProductBtn").addEventListener("click", ()=>{
+  const name = document.getElementById("productName").value;
+  const price = document.getElementById("productPrice").value;
+  const image = document.getElementById("productImage").value;
+  if(name && price && image){
+    push(productsRef,{name,price,image})
+      .then(()=>{document.getElementById("productName").value=""; document.getElementById("productPrice").value=""; document.getElementById("productImage").value="";})
+      .catch(err=>alert("Erro ao adicionar produto: "+err.message));
+  }
+});
+
+// Carregar Produtos
 onValue(productsRef, snapshot=>{
   productsGrid.innerHTML="";
   snapshot.forEach(snap=>{
@@ -134,39 +167,32 @@ onValue(productsRef, snapshot=>{
   });
 });
 
-// Comandos IA
-document.getElementById("sendCommandBtn").addEventListener("click", ()=>{
-  if(currentUser.email!==iaOwner){
-    iaChat.innerHTML += `<p style="color:#ff4444;">❌ Apenas admin principal pode enviar comandos.</p>`;
-    return;
+// Bloquear site
+document.getElementById("blockSiteBtn").addEventListener("click", ()=>{
+  set(siteStatusRef,"offline");
+});
+
+// Desbloquear site
+document.getElementById("unblockSiteBtn").addEventListener("click", ()=>{
+  set(siteStatusRef,"online");
+});
+
+// Adicionar admin
+document.getElementById("addAdminBtn").addEventListener("click", ()=>{
+  const email = document.getElementById("adminEmailInput").value.trim();
+  if(email && !admins.includes(email)){
+    admins.push(email);
+    alert(email + " adicionado como admin!");
   }
+});
 
-  const cmd = document.getElementById("iaCommand").value.toLowerCase().trim();
-
-  if(cmd.includes("bloqueie o site")){
-    set(siteStatusRef,"offline");
-    iaChat.innerHTML += `<p style="color:#0f0;">✅ Site bloqueado.</p>`;
-  } else if(cmd.includes("desbloqueie o site")){
-    set(siteStatusRef,"online");
-    iaChat.innerHTML += `<p style="color:#0f0;">✅ Site desbloqueado.</p>`;
-  } else if(cmd.includes("rank admin para")){
-    const email = cmd.split("rank admin para")[1].trim();
-    if(!admins.includes(email)){
-      admins.push(email);
-      iaChat.innerHTML += `<p style="color:#0f0;">✅ ${email} agora é admin.</p>`;
-    }
-  } else if(cmd.includes("remove admin")){
-    const email = cmd.split("remove admin")[1].trim();
-    if(email!==iaOwner){
-      admins = admins.filter(a=>a!==email);
-      iaChat.innerHTML += `<p style="color:#0f0;">✅ ${email} removido do admin.</p>`;
-    }
-  } else {
-    iaChat.innerHTML += `<p style="color:#ff4444;">❌ Comando não reconhecido.</p>`;
+// Remover admin
+document.getElementById("removeAdminBtn").addEventListener("click", ()=>{
+  const email = document.getElementById("adminEmailInput").value.trim();
+  if(email && email!==mainAdmin){
+    admins = admins.filter(a=>a!==email);
+    alert(email + " removido dos admins!");
   }
-
-  document.getElementById("iaCommand").value="";
-  iaChat.scrollTop = iaChat.scrollHeight;
 });
 </script>
 </body>
