@@ -67,10 +67,10 @@
 <script type="module">
 import { auth, database } from "./firebase-config.js";
 import { signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { ref, push, onValue, remove, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { ref, push, onValue, remove, set, get, child } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 let currentUser = null;
-let admins = ["marymartins5821@gmail.com", "jp9877475@gmail.com"]; // lista inicial de admins
+let admins = ["marymartins5821@gmail.com", "jp9877475@gmail.com"];
 const mainAdmin = "marymartins5821@gmail.com";
 
 const tabProfile = document.getElementById("tabProfile");
@@ -82,9 +82,26 @@ const productsTab = document.getElementById("productsTab");
 const adminTab = document.getElementById("adminTab");
 
 const productsGrid = document.getElementById("productsGrid");
+const siteOverlay = document.createElement("div");
+siteOverlay.style.position = "fixed";
+siteOverlay.style.top = "0";
+siteOverlay.style.left = "0";
+siteOverlay.style.width = "100%";
+siteOverlay.style.height = "100%";
+siteOverlay.style.background = "#000";
+siteOverlay.style.color = "#0f0";
+siteOverlay.style.fontSize = "2rem";
+siteOverlay.style.display = "flex";
+siteOverlay.style.justifyContent = "center";
+siteOverlay.style.alignItems = "center";
+siteOverlay.style.zIndex = "9999";
+siteOverlay.innerText = "Site bloqueado pelo admin. Volte depois.";
+siteOverlay.style.display = "none";
+document.body.appendChild(siteOverlay);
 
 // Controle site
 const siteStatusRef = ref(database,"siteStatus");
+const usersRef = ref(database,"users"); // banco de usuários logados
 
 // Tabs
 tabProfile.addEventListener("click", ()=>{
@@ -124,9 +141,9 @@ onAuthStateChanged(auth, user=>{
 onValue(siteStatusRef, snapshot=>{
   const status = snapshot.val();
   if(status==="offline" && (!currentUser || !admins.includes(currentUser.email))){
-    document.body.innerHTML = `<div style="color:#0f0; text-align:center; font-size:2rem; margin-top:50px;">
-      Site bloqueado pelo admin. Volte depois.
-    </div>`;
+    siteOverlay.style.display="flex";
+  } else {
+    siteOverlay.style.display="none";
   }
 });
 
@@ -140,7 +157,11 @@ document.getElementById("addProductBtn").addEventListener("click", ()=>{
   const image = document.getElementById("productImage").value;
   if(name && price && image){
     push(productsRef,{name,price,image})
-      .then(()=>{document.getElementById("productName").value=""; document.getElementById("productPrice").value=""; document.getElementById("productImage").value="";})
+      .then(()=>{
+        document.getElementById("productName").value="";
+        document.getElementById("productPrice").value="";
+        document.getElementById("productImage").value="";
+      })
       .catch(err=>alert("Erro ao adicionar produto: "+err.message));
   }
 });
@@ -177,21 +198,32 @@ document.getElementById("unblockSiteBtn").addEventListener("click", ()=>{
   set(siteStatusRef,"online");
 });
 
-// Adicionar admin
-document.getElementById("addAdminBtn").addEventListener("click", ()=>{
+// Adicionar admin (verifica se existe no Firebase)
+document.getElementById("addAdminBtn").addEventListener("click", async ()=>{
   const email = document.getElementById("adminEmailInput").value.trim();
-  if(email && !admins.includes(email)){
-    admins.push(email);
-    alert(email + " adicionado como admin!");
+  if(!email) return alert("Digite um email.");
+  
+  const snapshot = await get(child(usersRef,email.replace(/\./g,','))); // substitui '.' para chave
+  if(snapshot.exists()){
+    if(!admins.includes(email)){
+      admins.push(email);
+      alert(email + " adicionado como admin!");
+    } else alert("Este email já é admin!");
+  } else {
+    alert("Usuário não está logado no servidor!");
   }
 });
 
 // Remover admin
 document.getElementById("removeAdminBtn").addEventListener("click", ()=>{
   const email = document.getElementById("adminEmailInput").value.trim();
-  if(email && email!==mainAdmin){
+  if(!email) return;
+  if(email===mainAdmin) return alert("Não é possível remover o admin principal!");
+  if(admins.includes(email)){
     admins = admins.filter(a=>a!==email);
     alert(email + " removido dos admins!");
+  } else {
+    alert("Este usuário não é admin!");
   }
 });
 </script>
