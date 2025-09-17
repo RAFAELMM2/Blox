@@ -74,6 +74,20 @@ const productsGrid = document.getElementById("productsGrid");
 const iaChat = document.getElementById("iaChat");
 const siteStatusRef = ref(database,"siteStatus");
 
+// Funções de bloqueio/desbloqueio do site
+function bloquearSite(){
+  document.body.innerHTML = `
+    <h1 style="color:red;text-align:center;margin-top:50px;">
+      🔒 Site bloqueado pelo admin<br>
+      ⏳ Volte mais tarde!
+    </h1>
+  `;
+}
+
+function desbloquearSite(){
+  window.location.reload();
+}
+
 // Toggle admin panel
 adminBtn.addEventListener("click", ()=>{
   if(currentUser && admins.includes(currentUser.email)){
@@ -108,6 +122,14 @@ onAuthStateChanged(auth, user=>{
   if(user){
     currentUser=user;
     document.getElementById("userEmail").innerText="Email: "+user.email;
+
+    // Verificar status do site imediatamente
+    get(siteStatusRef).then(snap=>{
+      const status = snap.val() || "online";
+      if(status==="offline" && currentUser.email !== iaOwner){
+        bloquearSite();
+      }
+    });
   }else{window.location.href="login.html";}
 });
 
@@ -146,29 +168,20 @@ onValue(productsRef, snapshot=>{
   });
 });
 
-// Verifica status site
-function verificarStatusSite(status){
-  if(status==="offline" && (!currentUser || currentUser.email !== iaOwner)){
-    document.body.innerHTML = `
-      <h1 style="color:red;text-align:center;margin-top:50px;">
-        🔒 Site bloqueado pelo admin<br>
-        ⏳ Volte mais tarde!
-      </h1>
-    `;
-  }
-}
-
-// Listener siteStatus
+// Monitorar status do site em tempo real
 onValue(siteStatusRef, snap=>{
   const status = snap.val() || "online";
-  verificarStatusSite(status);
+  if(status==="offline" && (!currentUser || currentUser.email !== iaOwner)){
+    bloquearSite();
+  } else if(status==="online"){
+    desbloquearSite();
+  }
 });
 
 // IA - comandos
 const comandos = {
   "bloquear": () => set(siteStatusRef,"offline"),
   "desbloquear": () => set(siteStatusRef,"online")
-  // você pode adicionar mais comandos aqui: apagar produto, mudar preço, etc.
 };
 
 // Enviar comando IA
